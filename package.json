@@ -1,0 +1,27 @@
+{
+  "name": "homebridge-midi",
+  "version": "0.0.1",
+  "description": "midi plugin for homebridge: https://github.com/nfarina/homebridge",
+  "license": "ISC",
+  "keywords": [
+    "homebridge-plugin"
+  ],
+  "engines": {
+    "node": ">=0.12.0",
+    "homebridge": ">=0.2.0"
+  },
+  "author": {
+    "name": "Brooks Talley"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/brookstalley/homebridge-midi.git"
+  },
+  "dependencies": {
+    "request": "^2.65.0",
+    "midi": "^0.9.4"
+  },
+  "bugs": {
+    "url": "https://github.com/brookstalley/homebridge-midi/issues"
+  }
+}
