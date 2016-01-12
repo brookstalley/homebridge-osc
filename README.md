@@ -3,6 +3,8 @@ Midi Plugin For Homebridge: https://github.com/nfarina/homebridge
 
 This plugin presents MIDI notes as switches to Homebridge, and may be useful for getting Homekit events into DAWs, lighting scene controllers, etc. 
 
+Events can be sent bidirectionally. Currently the plugin supports sending notes to MIDI devices based on Homekit commands, and reflecting MIDI status as Homekit characteristics.
+
 Notes are automatically turned off one second after being sent.
 
 # Installation
@@ -19,24 +21,42 @@ Configuration sample:
     {
        "accessories": [
 			{
-				"accessory": "Midi",
-				"name": "note-c1",
-				"port": "AudioBox 22VSL MIDI Out",
-				"channel": 1,
-				"note": 48,
-				"service": "Switch"
+			  "accessory": "Midi",
+			  "name": "sleep",
+			  "port": "AudioBox 22VSL MIDI Out",
+			  "channel": 1,
+			  "note": 48,
+			  "service": "Switch",
+			  "characteristics": [
+				{
+				  "characteristic": "Brightness",
+				  "port": "AudioBox 22VSL MIDI In 2",
+				  "channel": 1,
+				  "controller": 1
+				}
+			  ]
 			},
 			{
-				"accessory": "Midi",
-				"name": "note-cs1",
-				"port": "AudioBox 22VSL MIDI Out",
-				"channel": 1,
-				"note": 49,
-				"service": "Switch"
-			},
+			  "accessory": "Midi",
+			  "name": "wake",
+			  "port": "AudioBox 22VSL MIDI Out",
+			  "channel": 1,
+			  "note": 49,
+			  "service": "Switch",
+			  "characteristics": [
+				{
+				  "characteristic": "Brightness",
+				  "port": "AudioBox 22VSL MIDI In 2",
+				  "channel": 1,
+				  "controller": 2
+				}
+			  ]
+			}
       ]
     }
 
 ```
+
+In that sample, when the Homekit "sleep" is triggered, MIDI note 48 (C3) will be sent to channel 1. And the "Brightness" characteristic of the Homekit device will reflect the latest value seen on channel 1, controller 1 (no scaling occurs; suggest you limit to 100 max).
 
 

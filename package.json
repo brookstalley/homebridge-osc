@@ -1,6 +1,6 @@
 {
   "name": "homebridge-midi",
-  "version": "0.0.1",
+  "version": "0.0.4",
   "description": "midi plugin for homebridge: https://github.com/nfarina/homebridge",
   "license": "ISC",
   "keywords": [
