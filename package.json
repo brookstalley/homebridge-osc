@@ -1,7 +1,7 @@
 {
-  "name": "homebridge-midi",
-  "version": "0.0.4",
-  "description": "midi plugin for homebridge: https://github.com/nfarina/homebridge",
+  "name": "homebridge-osc",
+  "version": "0.0.3",
+  "description": "OSC plugin for homebridge: https://github.com/nfarina/homebridge",
   "license": "ISC",
   "keywords": [
     "homebridge-plugin"
@@ -15,11 +15,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/brookstalley/homebridge-midi.git"
+    "url": "git://github.com/brookstalley/homebridge-osc.git"
   },
   "dependencies": {
-    "request": "^2.65.0",
-    "midi": "^0.9.4"
+    "osc": "^2.0.2"
   },
   "bugs": {
     "url": "https://github.com/brookstalley/homebridge-midi/issues"
