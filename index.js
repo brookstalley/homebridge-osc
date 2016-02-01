@@ -43,12 +43,12 @@ function getUdpPort(localAddress, localPort) {
     });
 
     newPort.on("message", function (message) {
-        this.log("Got OSC message");
+        //this.log("Got OSC message");
     }.bind(this));
 
     // Listen for incoming OSC bundles. 
     newPort.on("bundle", function (oscBundle) {
-        this.log("Got OSC bundle");
+        //this.log("Got OSC bundle");
         var packets = oscBundle["packets"];
 
         packets.forEach(function (packet) {
