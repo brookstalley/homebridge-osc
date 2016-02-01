@@ -20,7 +20,7 @@ var getIPAddresses = function () {
     }
 
     return ipAddresses;
-};
+}
 
 function getUdpPort(localAddress, localPort) {
     udpPorts.forEach(function (port) {
@@ -73,31 +73,6 @@ function getUdpPort(localAddress, localPort) {
     return newPort;
 }
 
-//debugging helper only
-//inspects an object and prints its properties (also inherited properties) 
-var iterate = function nextIteration(myObject, path) {
-    // this function iterates over all properties of an object and print them to the console
-    // when finding objects it goes one level  deeper
-    var name;
-    if (!path) {
-        console.log("---iterating--------------------")
-    }
-    for (name in myObject) {
-        if (typeof myObject[name] !== 'function') {
-            if (typeof myObject[name] !== 'object') {
-                console.log((path || "") + name + ': ' + myObject[name]);
-            } else {
-                nextIteration(myObject[name], path ? path + name + "." : name + ".");
-            }
-        } else {
-            console.log((path || "") + name + ': (function)');
-        }
-    }
-    if (!path) {
-        console.log("================================");
-    }
-};
-
 module.exports = function (homebridge) {
     Service = homebridge.hap.Service;
     Characteristic = homebridge.hap.Characteristic;
@@ -108,21 +83,25 @@ function OscAccessory(log, config) {
     this.log = log;
 
     this.name = config["name"];
-    this.accessoryType = config["service"] || "Switch";
+    this.accessoryType = config["service"] || "unknown";
 
     this.remoteAddress = config["remoteAddress"] || "255.255.255.255"; // Not really inet broadcast, will detect and use local subnet broadcast in send routine
     this.remotePort = parseInt(config["port"] || 9001);
     this.localAddress = config["localAddress"] || "0.0.0.0";
-    this.localPort = config["localPort"] || 9001;
+    this.localPort = config["localPort"] || false;
     this.address = config["address"];
 
-    myGetUdpPort = getUdpPort.bind(this);
-    this.udpPort = myGetUdpPort(this.localAddress, this.localPort);
+    if (this.localPort) {
+        myGetUdpPort = getUdpPort.bind(this);
+        this.udpPort = myGetUdpPort(this.localAddress, this.localPort);
+    }
 
     switch (this.accessoryType) {
         case "Multiswitch":
             this.switches = config["switches"];
             break;
+        case "Lightbulb":
+            this.hsb = config["hsb"] || false;
         case "Switch":
             break;
         default:
@@ -140,9 +119,7 @@ OscAccessory.prototype = {
         
         if (context == myContext) {
             // It came from us, so don't get stuck in a loop
-            if (callback) {
-                callback();
-            }
+            if (callback) { callback(); }
             return;
         }
         if (state) {
@@ -167,7 +144,6 @@ OscAccessory.prototype = {
                 }
                 );
                 var broadcast = (this.remoteAddress == "255.255.255.255") ? true : false;
-                //this.log("Sending to " + this.address + " on " + this.remoteAddress + ":" + this.remotePort + " (broadcast: " + broadcast + "):");
 
                 this.udpPort.send({
                     address: this.address,
@@ -178,36 +154,66 @@ OscAccessory.prototype = {
                 callback();
                 break;
 
-            case "Switch":
-                // Obsolete code from single-switch accessory sending multiple messages. Might still come in handy. So here it is.
-                this.oscRequest(this.messages, function (error, response) {
-                    if (error) {
-                        this.log('OSC function failed: %s', error.message);
-                        callback(error);
-                    } else {
-                        this.log('OSC function succeeded');
-                        callback();
-                    }
-                }.bind(this));
-                callback();
-                break;
             default:
                 throw new Error("Unknown homebrdige-osc accessory type in setPowerState");
         }
 
     },
 
-    getBrightness: function (callback) {
-        this.log("Brightness requested!");
-        this.log("Current brightness: " + this.brightness);
+    getHue: function (targetService, callback) {
+        this.log("Hue requested; current hue: " + this.hue);
+        callback(null, this.hue);
+    },
+
+    setHue: function (targetService, value, callback, context) {
+        var myContext = "fromHue";
+
+        if (context == myContext) {
+            // It came from us, so don't get stuck in a loop
+            if (callback) { callback(); }
+            return;
+        }
+        this.log("Setting hue to " + value);
+        this.services[0].getCharacteristic(Characteristic.Hue).setValue(value, undefined, myContext);
+        callback();
+    },
+
+    getSaturation: function (targetService, callback) {
+        this.log("Saturation requested; current saturation: " + this.saturation);
+        callback(null, this.saturation);
+    },
+
+    setSaturation: function (targetService, value, callback, context) {
+        var myContext = "fromSaturation";
+
+        if (context == myContext) {
+            // It came from us, so don't get stuck in a loop
+            if (callback) { callback(); }
+            return;
+        }
+        this.log("Setting saturation to " + value);
+        this.services[0].getCharacteristic(Characteristic.Saturation).setValue(value, undefined, myContext);
+        callback();
+    },
+
+    getBrightness: function (targetService, callback) {
+        this.log("Brightness requested; current brightness: " + this.brightness);
         callback(null, this.brightness);
     },
 
-    setBrightness: function (value, callback) {
+    setBrightness: function (targetService, value, callback, context) {
+        var myContext = "fromBrightness";
+
+        if (context == myContext) {
+            // It came from us, so don't get stuck in a loop
+            if (callback) { callback(); }
+            return;
+        }
         this.log("Setting brightness to " + value);
-        this._service.setCharacteristic(Characteristic.Brightness, value);
+        this.services[0].getCharacteristic(Characteristic.Brightness).setValue(value, undefined, myContext);
         callback();
     },
+
 
     identify: function (callback) {
         this.log("Identify requested!");
@@ -265,6 +271,39 @@ OscAccessory.prototype = {
                     this.log("Added switch " + switchName + " to " + this.name)
                 }
                 break;
+            case "Lightbulb":
+                // A light bulb, or something that looks like one. Optionally with HSB.
+                this.log("Adding lightbulb to " + this.name);
+
+                var service = new Service.Lightbulb(this.name);
+                var mySetPowerState = this.setPowerState.bind(this, service);
+
+                service.getCharacteristic(Characteristic.On).on('set', mySetPowerState);
+
+                if (this.hsb) {
+                    this.hue = 0;
+                    this.saturation = 0;
+                    this.brightness = 0;
+                    service
+                        .addCharacteristic(Characteristic.Hue)
+                        .on('set', this.setHue.bind(this,service))
+                        .on('get', this.getHue.bind(this, service));
+
+                    service
+                        .addCharacteristic(Characteristic.Saturation)
+                        .on('set', this.setSaturation.bind(this, service))
+                        .on('get', this.getSaturation.bind(this, service));
+
+                    service
+                        .addCharacteristic(Characteristic.Brightness)
+                        .on('set', this.setBrightness.bind(this, service))
+                        .on('get', this.getBrightness.bind(this, service));
+                }
+
+                this.services.push(service);
+                this.log("Added lightbulb to " + this.name)
+                break;
+
             default:
                 throw new Error("Unknown homebridge-osc accessory type in getServices");
         }
