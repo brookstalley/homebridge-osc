@@ -42,12 +42,18 @@ function getUdpPort(localAddress, localPort) {
         });
     });
 
+    newPort.on("message", function (message) {
+        this.log("Got OSC message");
+    }.bind(this));
+
     // Listen for incoming OSC bundles. 
     newPort.on("bundle", function (oscBundle) {
+        this.log("Got OSC bundle");
         var packets = oscBundle["packets"];
 
         packets.forEach(function (packet) {
             var address = packet["address"];
+            this.log("Address: " + address + ", my address: " + this.address);
             var args = packet["args"];
 
             if (address == this.address) {
@@ -61,6 +67,23 @@ function getUdpPort(localAddress, localPort) {
                         newValue = false;
                     }
                     this.services[i].getCharacteristic(Characteristic.On).setValue(newValue, undefined, "fromSetPowerState");
+                }
+            }
+            if (this.hsb) {
+                if (address == this.address + "/hue") {
+                    this.log("Setting hue...");
+                    var value = parseFloat(args[0]);
+                    this.services[0].getCharacteristic(Characteristic.Hue).setValue(value * 360, undefined);
+                }
+                if (address == this.address + "/saturation") {
+                    this.log("Setting saturation...");
+                    var value = parseFloat(args[0]);
+                    this.services[0].getCharacteristic(Characteristic.Saturation).setValue(value, undefined);
+                }
+                if (address == this.address + "/intensity") {
+                    this.log("Setting brightness...");
+                    var value = parseFloat(args[0]);
+                    this.services[0].getCharacteristic(Characteristic.Brightness).setValue(value, undefined);
                 }
             }
         }.bind(this));
@@ -113,8 +136,24 @@ function OscAccessory(log, config) {
 
 OscAccessory.prototype = {
 
+    sendOSC: function (args, characteristic) {
+        characteristic = characteristic || false;
+
+        var broadcast = (this.remoteAddress == "255.255.255.255") ? true : false;
+        var toAddress;
+        if (characteristic) {
+            toAddress = this.address + "/" + characteristic;
+        } else {
+            toAddress = this.address;
+        }
+        this.udpPort.send({
+            address: toAddress,
+            //broadcast: broadcast,
+            args: args
+        }, this.remoteAddress, this.remotePort);
+    },
+
     setPowerState: function (targetService, state, callback, context) {
-        self = this;
         var myContext = "fromSetPowerState";
         
         if (context == myContext) {
@@ -143,13 +182,8 @@ OscAccessory.prototype = {
                     }
                 }
                 );
-                var broadcast = (this.remoteAddress == "255.255.255.255") ? true : false;
-
-                this.udpPort.send({
-                    address: this.address,
-                    //broadcast: broadcast,
-                    args: args
-                }, this.remoteAddress, this.remotePort);
+                
+                this.sendOSC(args, false);
 
                 callback();
                 break;
@@ -175,6 +209,9 @@ OscAccessory.prototype = {
         }
         this.log("Setting hue to " + value);
         this.services[0].getCharacteristic(Characteristic.Hue).setValue(value, undefined, myContext);
+        // Need to map hue to 0.0 - 1.0 range
+        var oscHue = (value / 360.0);
+        this.sendOSC([oscHue],"hue");
         callback();
     },
 
@@ -185,14 +222,16 @@ OscAccessory.prototype = {
 
     setSaturation: function (targetService, value, callback, context) {
         var myContext = "fromSaturation";
-
+        this.log("setSaturation called");
         if (context == myContext) {
             // It came from us, so don't get stuck in a loop
+            this.log("From my context");
             if (callback) { callback(); }
             return;
         }
         this.log("Setting saturation to " + value);
         this.services[0].getCharacteristic(Characteristic.Saturation).setValue(value, undefined, myContext);
+        this.sendOSC([value],"saturation");
         callback();
     },
 
@@ -211,6 +250,7 @@ OscAccessory.prototype = {
         }
         this.log("Setting brightness to " + value);
         this.services[0].getCharacteristic(Characteristic.Brightness).setValue(value, undefined, myContext);
+        this.sendOSC([value],"intensity");
         callback();
     },
 
