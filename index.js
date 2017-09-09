@@ -4,6 +4,11 @@ var Service, Characteristic;
 
 var udpPorts = [];
 
+process.on('uncaughtException', function (er) {
+    console.error(er.stack)
+    process.exit(1)
+})
+
 var getIPAddresses = function () {
     var os = require("os"),
         interfaces = os.networkInterfaces(),
@@ -188,8 +193,13 @@ OscAccessory.prototype = {
                 callback();
                 break;
 
+            case "Lightbulb":
+                // Todo: Implement
+                callback();
+                break;
+
             default:
-                throw new Error("Unknown homebrdige-osc accessory type in setPowerState");
+                throw new Error("Unknown homebrdige-osc accessory type '" + this.accessoryType + "' in setPowerState");
         }
 
     },
