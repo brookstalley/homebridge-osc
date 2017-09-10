@@ -1,6 +1,6 @@
 {
   "name": "homebridge-osc",
-  "version": "0.0.6",
+  "version": "0.0.8",
   "description": "OSC plugin for homebridge: https://github.com/nfarina/homebridge",
   "license": "ISC",
   "keywords": [
@@ -20,7 +20,7 @@
     "url": "git://github.com/brookstalley/homebridge-osc.git"
   },
   "dependencies": {
-    "osc": "^2.0.2"
+    "osc": "^2.2.0"
   },
   "bugs": {
     "url": "https://github.com/brookstalley/homebridge-osc/issues"

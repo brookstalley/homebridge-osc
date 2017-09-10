@@ -107,7 +107,7 @@ function OscAccessory(log, config) {
         case "Switch":
             break;
         default:
-            throw new Error("Unknown homebridge-osc accessory type");
+            throw new Error("Unknown homebridge-osc accessory type: " + this.accessoryType);
     }
     this.log("OSC Accessory " + this.name + "(" + this.accessoryType + ") on " + this.remoteAddress + ":" + this.remotePort + this.address);
 }
