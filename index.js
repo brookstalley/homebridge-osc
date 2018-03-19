@@ -106,6 +106,9 @@ function OscAccessory(log, config) {
             this.hsb = config["hsb"] || false;
         case "Switch":
             break;
+        case "Multilight":
+            this.lights = config["lights"];
+            break;			
         default:
             throw new Error("Unknown homebridge-osc accessory type: " + this.accessoryType);
     }
@@ -162,6 +165,26 @@ OscAccessory.prototype = {
                 // Todo: Implement
                 callback();
                 break;
+				
+            case "Multilight":		
+                var args = [];
+                this.services.forEach(function (service) {
+                    // If this is our switch, add 1 to the OSC output, otherwise add 0 and set to off, supplying the context
+                    // so it doesn't trigger an OSC message (we'll send 0 here) or endless loop (which is bad form).
+                    if (targetService.subtype == service.subtype) {
+                        args.push(100);
+                    } else {
+                        args.push(0);
+                        service.getCharacteristic(Characteristic.On).setValue(false, undefined, myContext);
+                    }
+                }
+                );
+                if (!this.brightnessSet) {
+					this.sendOSC(args, false);
+				}
+                callback();
+                break;				
+			
             default:
                 throw new Error("Unknown homebrdige-osc accessory type '" + this.accessoryType + "' in setPowerState");
         }
@@ -214,9 +237,36 @@ OscAccessory.prototype = {
             return;
         }
         this.log("Setting brightness to " + value);
-        this.services[0].getCharacteristic(Characteristic.Brightness).setValue(value, undefined, myContext);
-        this.sendOSC([value],"intensity");
-        callback();
+		switch (this.accessoryType) {
+			case "Multilight":
+               var args = [];
+                this.services.forEach(function (service) {
+                    // If this is our switch, add 1 to the OSC output, otherwise add 0 and set to off, supplying the context
+                    // so it doesn't trigger an OSC message (we'll send 0 here) or endless loop (which is bad form).
+                    if (targetService.subtype == service.subtype) {						
+                        args.push(value);
+                    } else {
+                        args.push(0);
+                        service.getCharacteristic(Characteristic.Brightness).setValue(false, undefined, myContext);
+                    }
+				}				
+                );
+				this.brightnessSet=true;
+				var that = this;
+				if (this.timer) clearTimeout(this.timer);
+				this.timer = setTimeout(function () { 
+					that.brightnessSet=false;
+				},200);                
+				this.sendOSC([args],false);
+                callback();
+				break;
+			
+			default:
+				this.services[0].getCharacteristic(Characteristic.Brightness).setValue(value, undefined, myContext);
+				this.sendOSC([value],"intensity");
+				callback();			
+		}
+ 
     },
     identify: function (callback) {
         this.log("Identify requested!");
@@ -288,6 +338,28 @@ OscAccessory.prototype = {
                 this.services.push(service);
                 this.log("Added lightbulb to " + this.name)
                 break;
+            case "Multilight":
+                // Multiple lightbulbs in a radio button style
+                // Turning one on will turn the others off. Lights are sent as args to the specified address in the order
+                // they appear in the config file. If switches = ["alpha", "beta"], selecting alpha will send "/osc 1.0 0"; selecting
+                // beta will sent "/osc 0 1.0"
+                this.log("Adding multilight to " + this.name);
+                for (var i = 0; i < this.lights.length; i++) {
+                    var lightName = this.lights[i];
+                    var service = new Service.Lightbulb(lightName, lightName);
+                    // Bind a copy of the setPowerState function that sets "this" to the accessory and the first parameter
+                    // to the particular service that it is being called for.
+                    var mySetPowerState = this.setPowerState.bind(this, service);
+					this.brightness = 0;
+                    service.getCharacteristic(Characteristic.On).on('set', mySetPowerState);
+					service
+                        .addCharacteristic(Characteristic.Brightness)
+                        .on('set', this.setBrightness.bind(this, service))
+                        .on('get', this.getBrightness.bind(this, service));					
+                    this.services.push(service);
+                    this.log("Added light " + lightName + " to " + this.name)
+                }
+                break;				
             default:
                 throw new Error("Unknown homebridge-osc accessory type in getServices");
         }
